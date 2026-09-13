@@ -151,6 +151,15 @@
   .visibility-note{
     font-size:11.5px; color: var(--ink-soft); opacity:0.75; margin:0; text-align:center; max-width:280px;
   }
+  .link-btn{
+    background:none; border:none; padding:2px 4px;
+    font-size:12px; color: var(--ink-soft);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    opacity:0.75;
+    transition: opacity 0.15s ease, color 0.15s ease;
+  }
+  .link-btn:hover{ opacity:1; color: var(--ink); }
 
   /* shrink+fade animation applied on submit */
   #canvas-card.shrinking{
@@ -374,6 +383,88 @@
     font-size:12px; color:var(--ink-soft); opacity:0.7;
   }
 
+  /* ---------- admin ---------- */
+  #admin-link{
+    position: fixed;
+    right: 14px;
+    bottom: 10px;
+    z-index: 200;
+    background: none;
+    border: none;
+    font-size: 11px;
+    color: var(--ink-soft);
+    opacity: 0.35;
+    padding: 4px 6px;
+    letter-spacing: 0.3px;
+  }
+  #admin-link:hover{ opacity: 0.85; }
+
+  #admin-backdrop{
+    position: fixed; inset: 0;
+    background: rgba(46,59,46,0.45);
+    backdrop-filter: blur(2px);
+    z-index: 500;
+    display:flex; align-items:center; justify-content:center;
+    padding: 24px;
+  }
+  #admin-panel{
+    width: min(640px, 92vw);
+    max-height: 82vh;
+    background: var(--paper);
+    border: 1.5px solid var(--ink);
+    border-radius: 8px;
+    box-shadow: 6px 6px 0 rgba(46,59,46,0.18);
+    display:flex; flex-direction:column;
+    overflow:hidden;
+  }
+  #admin-header{
+    display:flex; align-items:flex-start; justify-content:space-between;
+    padding: 18px 20px 14px 20px;
+    border-bottom: 1.5px solid rgba(46,59,46,0.15);
+    gap: 12px;
+  }
+  #admin-header h2{
+    margin:0; font-size:19px; font-weight:500; font-style:italic;
+  }
+  #admin-count{
+    margin: 4px 0 0 0; font-size: 13px; color: var(--ink-soft);
+  }
+  #admin-actions{ display:flex; gap:8px; flex-shrink:0; }
+  #admin-actions button{
+    font-size: 12.5px;
+    padding: 7px 12px;
+    border-radius: 999px;
+    border: 1.5px solid var(--ink);
+    background: var(--paper);
+    color: var(--ink);
+  }
+  #admin-actions button:hover{ background: rgba(46,59,46,0.06); }
+  #admin-close{ background: var(--petal) !important; color: var(--paper) !important; }
+
+  #admin-list{
+    overflow-y: auto;
+    padding: 10px 14px;
+    display:flex; flex-direction:column; gap:2px;
+  }
+  .admin-row{
+    display:flex; align-items:center; gap:12px;
+    padding: 8px 6px;
+    border-bottom: 1px solid rgba(46,59,46,0.08);
+  }
+  .admin-row img{
+    width:40px; height:40px; object-fit:contain;
+    background: var(--cream);
+    border-radius: 6px;
+    border: 1px solid rgba(46,59,46,0.12);
+    flex-shrink:0;
+  }
+  .admin-row .admin-meta{ flex:1; min-width:0; }
+  .admin-row .admin-name{ font-size:14px; font-weight:600; }
+  .admin-row .admin-sub{ font-size:12px; color: var(--ink-soft); }
+  .admin-empty{
+    padding: 30px 10px; text-align:center; color: var(--ink-soft); font-size:13.5px;
+  }
+
   @media (prefers-reduced-motion: reduce){
     *{ animation-duration: 0.001s !important; animation-iteration-count: 1 !important; transition-duration: 0.2s !important; }
   }
@@ -438,6 +529,7 @@
       <input type="text" id="grower-name" placeholder="Whose flower is this? (optional)" maxlength="24">
       <button id="plant-btn">🌱 Plant my flower</button>
       <p class="visibility-note">Your flower joins a shared garden — everyone who opens this page can see it.</p>
+      <button id="view-garden-link" class="link-btn">Already planted one? View the garden</button>
     </div>
   </section>
 
@@ -456,6 +548,24 @@
     <div class="tooltip" id="tooltip"></div>
   </section>
 
+  <button id="admin-link" title="Admin">Admin</button>
+
+  <!-- ============ ADMIN PANEL ============ -->
+  <div id="admin-backdrop" class="hidden">
+    <div id="admin-panel">
+      <div id="admin-header">
+        <div>
+          <h2>Garden admin</h2>
+          <p id="admin-count">Loading…</p>
+        </div>
+        <div id="admin-actions">
+          <button id="admin-refresh">Refresh</button>
+          <button id="admin-close">Close</button>
+        </div>
+      </div>
+      <div id="admin-list"></div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -832,6 +942,28 @@
   const scene = document.getElementById('scene');
   const toast = document.getElementById('toast');
 
+  document.getElementById('view-garden-link').addEventListener('click', async () => {
+    const link = document.getElementById('view-garden-link');
+    link.disabled = true;
+    link.textContent = 'Opening the garden…';
+
+    const all = await preloadPromise;
+
+    drawScreen.classList.add('hidden');
+    gardenScreen.classList.remove('hidden');
+    spawnButterflies();
+    spawnPetals();
+    spawnClouds();
+    spawnTufts();
+
+    all.forEach((rec, i) => {
+      renderFlower(rec, { animateIn: true, delay: Math.min(i * 0.03, 1.2) });
+    });
+
+    scene.classList.add('pulled-back');
+    startPolling();
+  });
+
   plantBtn.addEventListener('click', async () => {
     if (!hasDrawn){
       plantBtn.textContent = 'Draw something first 🌱';
@@ -901,6 +1033,69 @@
     }, 400);
 
     startPolling();
+  });
+
+  /* ---------------- admin panel ---------------- */
+  const adminLink = document.getElementById('admin-link');
+  const adminBackdrop = document.getElementById('admin-backdrop');
+  const adminCount = document.getElementById('admin-count');
+  const adminList = document.getElementById('admin-list');
+
+  async function refreshAdmin(){
+    adminCount.textContent = 'Loading…';
+    adminList.innerHTML = '';
+    const records = await loadAllFlowers();
+    const sorted = records.slice().sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    adminCount.textContent = sorted.length === 1
+      ? '1 flower planted'
+      : `${sorted.length} flowers planted`;
+
+    if (!sorted.length){
+      adminList.innerHTML = '<div class="admin-empty">No flowers planted yet.</div>';
+      return;
+    }
+
+    sorted.forEach((rec, i) => {
+      const row = document.createElement('div');
+      row.className = 'admin-row';
+
+      const img = document.createElement('img');
+      img.src = rec.drawing;
+      img.alt = 'Planted flower thumbnail';
+
+      const meta = document.createElement('div');
+      meta.className = 'admin-meta';
+      const nameEl = document.createElement('div');
+      nameEl.className = 'admin-name';
+      nameEl.textContent = rec.name ? rec.name : `Flower #${rec.num}`;
+      const subEl = document.createElement('div');
+      subEl.className = 'admin-sub';
+      subEl.textContent = timeAgo(rec.createdAt);
+
+      meta.appendChild(nameEl);
+      meta.appendChild(subEl);
+      row.appendChild(img);
+      row.appendChild(meta);
+      adminList.appendChild(row);
+    });
+  }
+
+  adminLink.addEventListener('click', () => {
+    adminBackdrop.classList.remove('hidden');
+    refreshAdmin();
+  });
+  document.getElementById('admin-refresh').addEventListener('click', refreshAdmin);
+  document.getElementById('admin-close').addEventListener('click', () => {
+    adminBackdrop.classList.add('hidden');
+  });
+  adminBackdrop.addEventListener('click', (e) => {
+    if (e.target === adminBackdrop) adminBackdrop.classList.add('hidden');
+  });
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !adminBackdrop.classList.contains('hidden')){
+      adminBackdrop.classList.add('hidden');
+    }
   });
 
 })();
